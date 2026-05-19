@@ -24,6 +24,16 @@ int is_text_file(const char *filename) {
     return 1;
 }
 
+int has_sau_extension(const char *filename) {
+    size_t len = strlen(filename);
+    return len >= 4 && strcmp(filename + len - 4, ".sau") == 0;
+}
+
+const char *get_basename(const char *path) {
+    const char *slash = strrchr(path, '/');
+    return slash ? slash + 1 : path;
+}
+
 int main(int argc, char *argv[]) {
     if (argc < 2) {
         printf("Kullanim: ./tarsau -b veya ./tarsau -a\n");
@@ -70,7 +80,7 @@ int main(int argc, char *argv[]) {
             stat(argv[file_indices[i]], &st);
             char temp[512];
             // Format: |Dosya adı, izinler, boyut| 
-            sprintf(temp, "|%s,%o,%ld|", argv[file_indices[i]], st.st_mode & 0777, st.st_size);
+            sprintf(temp, "|%s,%o,%ld|", get_basename(argv[file_indices[i]]), st.st_mode & 0777, st.st_size);
             strcat(header, temp);
         }
 
@@ -98,6 +108,11 @@ int main(int argc, char *argv[]) {
         }
         char *archive_name = argv[2]; 
         char *target_dir = (argc > 3) ? argv[3] : "."; 
+
+        if (!has_sau_extension(archive_name)) {
+            printf("Ar\305\237iv dosyas\304\261 uygunsuz veya bozuk!\n");
+            return 1;
+        }
 
         FILE *sau = fopen(archive_name, "r");
         if (!sau) {
@@ -145,6 +160,12 @@ int main(int argc, char *argv[]) {
             // Format: Dosya adı, izinler, boyut 
             if (sscanf(token, "%[^,],%o,%ld", name, &mode, &f_size) == 3) {
                 FILE *out = fopen(name, "w");
+                if (!out) {
+                    perror("Dosya olusturma hatasi");
+                    free(header);
+                    fclose(sau);
+                    return 1;
+                }
                 if (out) {
                     for (long i = 0; i < f_size; i++) {
                         int ch = fgetc(sau); 
